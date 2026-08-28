@@ -43,7 +43,7 @@ def init_db():
                 sensor_id VARCHAR(100) NOT NULL,
                 metric_type VARCHAR(50) NOT NULL,
                 value NUMERIC NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             );
         """)
         conn.commit()
@@ -61,7 +61,7 @@ def health():
 @app.route('/openapi.json', methods=['GET'])
 def get_openapi():
     """Exponerar OpenAPI-kontraktet i JSON-format för Schemathesis."""
-    openapi_path = os.path.join(os.path.dirname(__file__), '..', 'openapi.yaml')
+    openapi_path = os.path.join(os.path.dirname(__file__), 'openapi.yaml')
     if os.path.exists(openapi_path):
         with open(openapi_path, 'r', encoding='utf-8') as f:
             spec = yaml.safe_load(f)
@@ -94,7 +94,7 @@ def post_telemetry():
     """Sparar ny telemetridata från en sensor."""
     data = request.get_json()
     
-    if not data:
+    if not isinstance(data, dict):
         return jsonify({"error": "Ingen JSON-payload angiven"}), 400
         
     sensor_id = data.get('sensor_id')
@@ -104,7 +104,32 @@ def post_telemetry():
     
     if not sensor_id or not metric_type or value is None:
         return jsonify({"error": "Obligatoriska fält saknas (sensor_id, metric_type, value)"}), 400
+    
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return jsonify({"error": "Value måste vara ett numeriskt värde"}), 400
+
+    if not isinstance(sensor_id, str) or not isinstance(metric_type, str):
+        return jsonify({"error": "sensor_id or metric_type måste vara strängar"}), 400
+
+    if 'timestamp' in data and data ['timestamp'] is not None:
+        ts = data['timestamp']
+        if not isinstance(ts, str):
+            return jsonify({"error":"timestamp måste vara en sträng"}), 400
         
+        try:
+            parsed = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            offset = parsed.utcoffset()
+
+            if offset is not None and abs(parsed.utcoffset().total_seconds()) > 15 * 3600 + 59 * 60:
+                raise ValueError("offset out of range")
+        except ValueError:
+            return jsonify({"error": "timestamp har ogiltigt format"}), 400
+
+    elif 'timestamp' in data and data['timestamp'] is None:
+        return jsonify({"error": "timestamp får inte vara null"}), 400
+    else:
+        ts = None
+         
     try:
         conn = get_db_connection()
         cur = conn.cursor()

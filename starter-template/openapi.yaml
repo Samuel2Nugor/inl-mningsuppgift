@@ -68,9 +68,11 @@ components:
       properties:
         sensor_id:
           type: string
+          minLength: 1
           example: temp-sensor-01
         metric_type:
           type: string
+          minLength: 1
           example: temperature
         value:
           type: number

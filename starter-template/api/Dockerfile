@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY api/requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime (Minimal image & non-root user)
@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /root/.local /home/appuser/.local
-COPY . .
+COPY api/app.py .
+COPY openapi.yaml .
 
 # Konfigurera miljö och icke-root användare
 ENV PATH=/home/appuser/.local/bin:$PATH
